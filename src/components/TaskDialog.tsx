@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 // Redux
 import { useSelector, useDispatch } from 'react-redux';
-import { addTask, updateTask } from '../features/columnsSlice';
+import { addTask, updateTask, moveTask } from '../features/columnsSlice';
 // Context
 import { useAuth } from '../context/AuthContext';
 // Custom types
 import { ColumnType } from '../types/ColumnType';
 // Firebase
-import { addTaskToFirestore, updateTaskInFirestore } from '../firebase/firestoreUtils';
+import { addTaskToFirestore, updateTaskInFirestore, moveTaskBetweenColumns } from '../firebase/firestoreUtils';
 // MUI
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, MenuItem } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress'; // Import MUI CircularProgress
@@ -38,6 +38,10 @@ const TaskDialog: React.FC<{
       setTitle(initialValues.title);
       setDescription(initialValues.description); 
     } 
+    else {
+      setTitle('');
+      setDescription('');
+    }
     // In any mode, set the state to the default state
     setState(defaultState); 
   }, [isEditing, initialValues, defaultState]);
@@ -58,9 +62,15 @@ const TaskDialog: React.FC<{
 
       if (isEditing) {
         // Update the task in Firestore
-        await updateTaskInFirestore(user.uid, state, task);
+        await updateTaskInFirestore(user.uid, defaultState, task);
         // Dispatch Redux action to update the state
-        dispatch(updateTask({ columnId: state, task }));
+        dispatch(updateTask({ columnId: defaultState, task }));
+
+        // If the state has changed, move the task to the new column
+        if (state !== defaultState) {
+          await moveTaskBetweenColumns(user.uid, defaultState, state, taskId);
+        }
+        dispatch(moveTask({ taskId, fromColumnId: defaultState, toColumnId: state }));
       } else {
         // Add the task to Firestore
         await addTaskToFirestore(user.uid, state, task);
